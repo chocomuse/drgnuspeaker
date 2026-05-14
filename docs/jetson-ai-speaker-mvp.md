@@ -38,7 +38,8 @@ Use a wake detector behind the `WakeDetector` interface.
 Recommended path:
 
 - Prototype: keyboard or GPIO button.
-- Beta: openWakeWord custom model for `jinuya` and `hey jinu`.
+- First always-listening build: Vosk Korean phrase detection with `DRGNU_WAKE_MODE=phrase`.
+- Beta: openWakeWord or Porcupine custom model for `jinuya` and `hey jinu`.
 - Production: benchmark false accepts, missed wakes, noisy-room performance, and CPU use on Jetson Nano.
 
 ## Phase 4: App And Web Sync
@@ -53,4 +54,3 @@ The app and web dashboard should read from the same server history:
 - device online/offline state
 
 For near-real-time updates, add WebSocket, Server-Sent Events, Firebase Realtime, or Supabase Realtime later. Polling is enough for MVP.
-

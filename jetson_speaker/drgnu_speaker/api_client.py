@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, Optional
 
 import requests
 
@@ -12,10 +12,10 @@ from .config import SpeakerConfig
 @dataclass(frozen=True)
 class AnalysisResult:
     answer: str
-    score: int | None
+    score: Optional[int]
     risk_level: str
     reason: str
-    raw: dict[str, Any]
+    raw: Dict[str, Any]
 
     def spoken_summary(self) -> str:
         score_text = f" 상태 점수는 {self.score}점입니다." if self.score is not None else ""
@@ -51,7 +51,7 @@ class DrgnuApiClient:
         return _parse_analysis_result(payload)
 
 
-def _parse_analysis_result(payload: dict[str, Any]) -> AnalysisResult:
+def _parse_analysis_result(payload: Dict[str, Any]) -> AnalysisResult:
     answer = _first_text(payload, "answer", "response", "ai_answer", "aiAnswer")
     score = _first_int(payload, "session_score", "score_total", "total_score", "score")
     risk_level = _first_text(payload, "risk", "risk_level", "riskStatus", "risk_status")
@@ -69,7 +69,7 @@ def _parse_analysis_result(payload: dict[str, Any]) -> AnalysisResult:
     )
 
 
-def _first_text(payload: dict[str, Any], *keys: str) -> str:
+def _first_text(payload: Dict[str, Any], *keys: str) -> str:
     for key in keys:
         value = payload.get(key)
         if value is not None and str(value).strip():
@@ -77,7 +77,7 @@ def _first_text(payload: dict[str, Any], *keys: str) -> str:
     return ""
 
 
-def _first_int(payload: dict[str, Any], *keys: str) -> int | None:
+def _first_int(payload: Dict[str, Any], *keys: str) -> Optional[int]:
     for key in keys:
         value = payload.get(key)
         if value is None or str(value).strip() == "":

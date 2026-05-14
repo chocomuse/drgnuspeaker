@@ -3,8 +3,19 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional, Tuple
 
 from dotenv import load_dotenv
+
+
+DEFAULT_WAKE_PHRASES = (
+    "\uc9c0\ub204\uc57c",
+    "\uc9c4\uc6b0\uc57c",
+    "\ud5e4\uc774 \uc9c0\ub204",
+    "\ud5e4\uc774 \uc9c4\uc6b0",
+    "hey jinu",
+    "hey ginu",
+)
 
 
 @dataclass(frozen=True)
@@ -18,8 +29,11 @@ class SpeakerConfig:
     sample_rate: int
     channels: int
     tts_command: str
-    ptt_gpio_pin: int | None
-    led_gpio_pin: int | None
+    ptt_gpio_pin: Optional[int]
+    led_gpio_pin: Optional[int]
+    wake_model_path: Path
+    wake_phrases: Tuple[str, ...]
+    wake_timeout_seconds: float
     work_dir: Path
 
     @property
@@ -41,6 +55,14 @@ def load_config() -> SpeakerConfig:
         tts_command=os.getenv("DRGNU_TTS_COMMAND", "spd-say").strip(),
         ptt_gpio_pin=_optional_int("DRGNU_PTT_GPIO_PIN"),
         led_gpio_pin=_optional_int("DRGNU_LED_GPIO_PIN"),
+        wake_model_path=Path(
+            os.getenv(
+                "DRGNU_WAKE_MODEL_PATH",
+                "models/vosk-model-small-ko-0.22",
+            )
+        ),
+        wake_phrases=_configured_wake_phrases(),
+        wake_timeout_seconds=float(os.getenv("DRGNU_WAKE_TIMEOUT_SECONDS", "0")),
         work_dir=Path(os.getenv("DRGNU_WORK_DIR", "/tmp/drgnu-speaker")),
     )
 
@@ -52,9 +74,22 @@ def _required_env(name: str) -> str:
     return value
 
 
-def _optional_int(name: str) -> int | None:
+def _optional_int(name: str) -> Optional[int]:
     value = os.getenv(name, "").strip()
     if not value:
         return None
     return int(value)
 
+
+def _configured_wake_phrases() -> Tuple[str, ...]:
+    value = os.getenv("DRGNU_WAKE_PHRASES", "").strip()
+    if not value:
+        return DEFAULT_WAKE_PHRASES
+    return _csv_tuple(value)
+
+
+def _csv_tuple(value: str) -> Tuple[str, ...]:
+    items = tuple(item.strip() for item in value.split(",") if item.strip())
+    if not items:
+        raise RuntimeError("DRGNU_WAKE_PHRASES must contain at least one phrase")
+    return items

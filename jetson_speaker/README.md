@@ -45,6 +45,45 @@ python -m drgnu_speaker.main
 
 The default `DRGNU_WAKE_MODE=keyboard` waits for Enter instead of a real wake word. This is useful while testing on a desktop or before the wake word model is trained.
 
+## Enable Phrase Wake Detection
+
+The first real wake mode uses Vosk offline speech recognition with a Korean model. It listens for the default phrases:
+
+- `jinuya` / Korean "Jinuya"
+- `jinwoo-ya` / Korean "Jinwoo-ya"
+- `hey jinu`
+- `hey ginu`
+
+Install the model on the Jetson:
+
+```bash
+cd jetson_speaker
+./scripts/download_vosk_ko_model.sh
+```
+
+Then edit `.env`:
+
+```env
+DRGNU_WAKE_MODE=phrase
+DRGNU_WAKE_MODEL_PATH=models/vosk-model-small-ko-0.22
+```
+
+Run:
+
+```bash
+python -m drgnu_speaker.main
+```
+
+When the terminal shows:
+
+```text
+[drgnu-speaker] listening for wake phrase
+```
+
+say `jinuya` or `hey jinu`. If it matches, the speaker says the ready prompt and starts recording the actual user request.
+
+You can override phrases with `DRGNU_WAKE_PHRASES`, separated by commas. Leave it unset to use the built-in Korean and romanized defaults.
+
 ## Run On Boot
 
 Copy the systemd unit:
@@ -68,9 +107,10 @@ The custom phrases are:
 Recommended production path:
 
 1. Start with `keyboard` mode for API and audio validation.
-2. Add a physical button mode for reliable early prototypes.
-3. Train or integrate a wake word engine such as openWakeWord or Porcupine.
-4. Route wake events into `WakeDetector.wait_for_wake()`.
+2. Use `phrase` mode with Vosk for the first always-listening prototype.
+3. Add a physical button mode for reliable hardware fallback.
+4. Train or integrate a dedicated wake word engine such as openWakeWord or Porcupine.
+5. Route wake events into `WakeDetector.wait_for_wake()`.
 
 ## Server Contract
 
@@ -92,4 +132,3 @@ It accepts the same broad response fields used by the Android app:
 - `session_score`, `score_total`, or `total_score`
 - `risk`, `risk_level`, or `riskStatus`
 - `reason`
-

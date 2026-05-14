@@ -10,6 +10,12 @@ from .tts import TextToSpeech
 from .wake_word import build_wake_detector
 
 
+START_MESSAGE = "\uc9c0\ub204 \uc2a4\ud53c\ucee4\ub97c \uc2dc\uc791\ud569\ub2c8\ub2e4."
+READY_MESSAGE = "\ub124, \ub9d0\uc500\ud574 \uc8fc\uc138\uc694."
+STOP_MESSAGE = "\uc9c0\ub204 \uc2a4\ud53c\ucee4\ub97c \uc885\ub8cc\ud569\ub2c8\ub2e4."
+ERROR_PREFIX = "\ucc98\ub9ac \uc911 \uc624\ub958\uac00 \ubc1c\uc0dd\ud588\uc2b5\ub2c8\ub2e4."
+
+
 def main() -> None:
     config = load_config()
     wake_detector = build_wake_detector(config)
@@ -18,7 +24,7 @@ def main() -> None:
     tts = TextToSpeech(config.tts_command)
     status = StatusReporter()
 
-    tts.speak("지누 스피커를 시작합니다.")
+    tts.speak(START_MESSAGE)
 
     while True:
         try:
@@ -26,7 +32,7 @@ def main() -> None:
             wake_detector.wait_for_wake()
 
             status.set_state(SpeakerState.LISTENING)
-            tts.speak("네, 말씀해 주세요.")
+            tts.speak(READY_MESSAGE)
 
             status.set_state(SpeakerState.RECORDING)
             audio_path = recorder.record_once()
@@ -37,14 +43,13 @@ def main() -> None:
             status.set_state(SpeakerState.SPEAKING)
             tts.speak(result.spoken_summary())
         except KeyboardInterrupt:
-            tts.speak("지누 스피커를 종료합니다.")
+            tts.speak(STOP_MESSAGE)
             break
         except Exception as error:
             status.set_state(SpeakerState.ERROR)
             print(traceback.format_exc(), flush=True)
-            tts.speak(f"처리 중 오류가 발생했습니다. {error}")
+            tts.speak(f"{ERROR_PREFIX} {error}")
 
 
 if __name__ == "__main__":
     main()
-

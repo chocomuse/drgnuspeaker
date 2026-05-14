@@ -8,5 +8,6 @@ sudo apt-get install -y \
   libportaudio2 \
   libsndfile1 \
   alsa-utils \
-  speech-dispatcher
-
+  speech-dispatcher \
+  unzip \
+  wget
