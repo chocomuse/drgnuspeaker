@@ -76,7 +76,9 @@ Request:
 ```json
 {
   "pairing_code": "482913",
-  "device_name": "Living Room Jinu"
+  "device_name": "Living Room Jinu",
+  "user_id": "user@example.com",
+  "user_name": "User Name"
 }
 ```
 
@@ -172,4 +174,3 @@ GET /api/sessions/{session_id}
 ```
 
 The Android app can keep using `api/get_history` during MVP, then migrate to the session endpoints when the backend is ready.
-

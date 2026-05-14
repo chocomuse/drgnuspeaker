@@ -28,7 +28,12 @@ class DrgnuApiClient:
     def __init__(self, config: SpeakerConfig) -> None:
         self._config = config
         self._session = requests.Session()
-        self._session.headers.update({"X-API-Key": config.api_key})
+        self._session.headers.update({
+            "X-API-Key": config.api_key,
+            "X-Device-Id": config.device_id,
+        })
+        if config.device_token:
+            self._session.headers.update({"Authorization": f"Bearer {config.device_token}"})
 
     def analyze_audio(self, audio_path: Path) -> AnalysisResult:
         with audio_path.open("rb") as audio_file, audio_path.open("rb") as stt_file:

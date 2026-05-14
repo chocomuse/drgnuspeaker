@@ -34,11 +34,24 @@ class SpeakerConfig:
     wake_model_path: Path
     wake_phrases: Tuple[str, ...]
     wake_timeout_seconds: float
+    pairing_enabled: bool
+    pairing_poll_seconds: float
+    device_name: str
+    device_token: str
+    device_token_path: Path
     work_dir: Path
 
     @property
     def analysis_url(self) -> str:
         return f"{self.base_url.rstrip('/')}/api/stt-analyze"
+
+    @property
+    def pairing_code_url(self) -> str:
+        return f"{self.base_url.rstrip('/')}/api/devices/pairing-code"
+
+    @property
+    def pairing_status_url(self) -> str:
+        return f"{self.base_url.rstrip('/')}/api/devices/pairing-status"
 
 
 def load_config() -> SpeakerConfig:
@@ -63,6 +76,11 @@ def load_config() -> SpeakerConfig:
         ),
         wake_phrases=_configured_wake_phrases(),
         wake_timeout_seconds=float(os.getenv("DRGNU_WAKE_TIMEOUT_SECONDS", "0")),
+        pairing_enabled=_bool_env("DRGNU_PAIRING_ENABLED", True),
+        pairing_poll_seconds=float(os.getenv("DRGNU_PAIRING_POLL_SECONDS", "3")),
+        device_name=os.getenv("DRGNU_DEVICE_NAME", "Drgnu Jetson Speaker").strip(),
+        device_token=os.getenv("DRGNU_DEVICE_TOKEN", "").strip(),
+        device_token_path=Path(os.getenv("DRGNU_DEVICE_TOKEN_PATH", ".device-token")),
         work_dir=Path(os.getenv("DRGNU_WORK_DIR", "/tmp/drgnu-speaker")),
     )
 
@@ -79,6 +97,13 @@ def _optional_int(name: str) -> Optional[int]:
     if not value:
         return None
     return int(value)
+
+
+def _bool_env(name: str, default: bool) -> bool:
+    value = os.getenv(name, "").strip().lower()
+    if not value:
+        return default
+    return value in ("1", "true", "yes", "y", "on")
 
 
 def _configured_wake_phrases() -> Tuple[str, ...]:

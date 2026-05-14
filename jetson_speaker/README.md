@@ -37,6 +37,34 @@ Edit `.env` and set:
 - `DRGNU_DEVICE_ID`
 - `DRGNU_SESSION_ID`
 
+## Pair With The Android App
+
+When `DRGNU_PAIRING_ENABLED=true` and no device token exists, the speaker calls:
+
+```text
+POST /api/devices/pairing-code
+```
+
+It reads the pairing code aloud, then polls:
+
+```text
+POST /api/devices/pairing-status
+```
+
+In the Android app, open:
+
+```text
+Manage -> AI Speaker -> Link AI speaker
+```
+
+Enter the spoken pairing code. Once the backend returns `device_access_token`, the speaker saves it to `.device-token` and uses it for later analysis calls.
+
+For local development without backend pairing, set:
+
+```env
+DRGNU_PAIRING_ENABLED=false
+```
+
 ## Run In Development
 
 ```bash

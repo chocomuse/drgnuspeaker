@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import traceback
+from dataclasses import replace
 
 from .api_client import DrgnuApiClient
 from .audio_io import AudioRecorder
 from .config import load_config
+from .pairing import DevicePairingClient
 from .status import SpeakerState, StatusReporter
 from .tts import TextToSpeech
 from .wake_word import build_wake_detector
@@ -18,10 +20,13 @@ ERROR_PREFIX = "\ucc98\ub9ac \uc911 \uc624\ub958\uac00 \ubc1c\uc0dd\ud588\uc2b5\
 
 def main() -> None:
     config = load_config()
+    tts = TextToSpeech(config.tts_command)
+    device_token = DevicePairingClient(config).ensure_device_token(tts)
+    if device_token:
+        config = replace(config, device_token=device_token)
     wake_detector = build_wake_detector(config)
     recorder = AudioRecorder(config)
     api_client = DrgnuApiClient(config)
-    tts = TextToSpeech(config.tts_command)
     status = StatusReporter()
 
     tts.speak(START_MESSAGE)
