@@ -59,10 +59,10 @@ Manage -> AI Speaker -> Link AI speaker
 
 Enter the spoken pairing code. Once the backend returns `device_access_token`, the speaker saves it to `.device-token` and uses it for later analysis calls.
 
-For local development without backend pairing, set:
+For backend pairing, set:
 
 ```env
-DRGNU_PAIRING_ENABLED=false
+DRGNU_PAIRING_ENABLED=true
 ```
 
 ## Run In Development

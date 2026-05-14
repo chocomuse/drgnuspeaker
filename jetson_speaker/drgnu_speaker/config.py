@@ -76,7 +76,7 @@ def load_config() -> SpeakerConfig:
         ),
         wake_phrases=_configured_wake_phrases(),
         wake_timeout_seconds=float(os.getenv("DRGNU_WAKE_TIMEOUT_SECONDS", "0")),
-        pairing_enabled=_bool_env("DRGNU_PAIRING_ENABLED", True),
+        pairing_enabled=_bool_env("DRGNU_PAIRING_ENABLED", False),
         pairing_poll_seconds=float(os.getenv("DRGNU_PAIRING_POLL_SECONDS", "3")),
         device_name=os.getenv("DRGNU_DEVICE_NAME", "Drgnu Jetson Speaker").strip(),
         device_token=os.getenv("DRGNU_DEVICE_TOKEN", "").strip(),
