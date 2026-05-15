@@ -6,6 +6,7 @@ from dataclasses import replace
 from .api_client import DrgnuApiClient
 from .audio_io import AudioRecorder
 from .config import load_config
+from .local_pairing import LocalPairingServer
 from .pairing import DevicePairingClient
 from .status import SpeakerState, StatusReporter
 from .tts import TextToSpeech
@@ -21,6 +22,8 @@ ERROR_PREFIX = "\ucc98\ub9ac \uc911 \uc624\ub958\uac00 \ubc1c\uc0dd\ud588\uc2b5\
 def main() -> None:
     config = load_config()
     tts = TextToSpeech(config.tts_command)
+    local_pairing_server = LocalPairingServer(config)
+    local_pairing_server.start()
     device_token = DevicePairingClient(config).ensure_device_token(tts)
     if device_token:
         config = replace(config, device_token=device_token)
@@ -49,6 +52,7 @@ def main() -> None:
             tts.speak(result.spoken_summary())
         except KeyboardInterrupt:
             tts.speak(STOP_MESSAGE)
+            local_pairing_server.stop()
             break
         except Exception as error:
             status.set_state(SpeakerState.ERROR)

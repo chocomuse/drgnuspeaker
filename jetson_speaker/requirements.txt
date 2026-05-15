@@ -3,3 +3,4 @@ requests==2.32.3
 sounddevice==0.4.7
 soundfile==0.12.1
 vosk==0.3.45
+zeroconf==0.132.2

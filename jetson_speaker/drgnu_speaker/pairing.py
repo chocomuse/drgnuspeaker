@@ -83,6 +83,25 @@ class DevicePairingClient:
 
         raise TimeoutError("Device pairing code expired before the app claimed it")
 
+    def claim_local_pairing(self, user_id: str, user_name: str, device_name: str) -> str:
+        response = self._session.post(
+            f"{self._config.base_url.rstrip('/')}/api/devices/link-local",
+            json={
+                "device_id": self._config.device_id,
+                "device_name": device_name or self._config.device_name,
+                "device_type": "jetson_nano_speaker",
+                "user_id": user_id,
+                "user_name": user_name,
+            },
+            timeout=(15, 30),
+        )
+        response.raise_for_status()
+        payload = response.json()
+        token = str(payload.get("device_access_token", "")).strip()
+        if token:
+            self._save_token(token)
+        return token
+
     def _load_existing_token(self) -> str:
         if self._config.device_token:
             return self._config.device_token

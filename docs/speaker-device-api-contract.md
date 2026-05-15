@@ -29,6 +29,68 @@ X-API-Key: {api_key}
 
 ## Pairing
 
+### Local Network Pairing
+
+For pairing without a spoken code, the Jetson advertises an mDNS service:
+
+```text
+Type: _drgnu-speaker._tcp.local.
+Port: 8765 by default
+Properties:
+  device_id
+  device_name
+  path=/pair
+```
+
+The Android app discovers the service and sends user account info directly to the speaker:
+
+```text
+POST http://{speaker-ip}:8765/pair
+```
+
+Request:
+
+```json
+{
+  "device_name": "Living Room Jinu",
+  "user_id": "user@example.com",
+  "user_name": "User Name"
+}
+```
+
+The Jetson then calls the backend:
+
+```text
+POST /api/devices/link-local
+X-API-Key: {api_key}
+X-Device-Id: {device_id}
+```
+
+Request:
+
+```json
+{
+  "device_id": "jetson-nano-dev-001",
+  "device_name": "Living Room Jinu",
+  "device_type": "jetson_nano_speaker",
+  "user_id": "user@example.com",
+  "user_name": "User Name"
+}
+```
+
+Response:
+
+```json
+{
+  "linked": true,
+  "device_id": "jetson-nano-dev-001",
+  "device_name": "Living Room Jinu",
+  "device_access_token": "device-token"
+}
+```
+
+The Jetson stores `device_access_token` locally in `.device-token`.
+
 ### Create Pairing Code
 
 Called by the Jetson when it is not linked to an account.

@@ -39,6 +39,37 @@ Edit `.env` and set:
 
 ## Pair With The Android App
 
+### Option A: Nearby Speaker Discovery
+
+This is the recommended screenless setup path. The speaker advertises itself on the local Wi-Fi network through mDNS:
+
+```text
+_drgnu-speaker._tcp.local.
+```
+
+Keep this enabled in `.env`:
+
+```env
+DRGNU_LOCAL_PAIRING_ENABLED=true
+DRGNU_LOCAL_PAIRING_PORT=8765
+```
+
+Then open the Android app:
+
+```text
+Manage -> AI Speaker -> Link AI speaker -> Find nearby speaker
+```
+
+Select the discovered speaker and tap `Link found speaker`. The Android app sends the logged-in user info to the speaker over local Wi-Fi, and the speaker asks the backend to link `device_id` to that user.
+
+Backend endpoint required:
+
+```text
+POST /api/devices/link-local
+```
+
+### Option B: Spoken Pairing Code
+
 When `DRGNU_PAIRING_ENABLED=true` and no device token exists, the speaker calls:
 
 ```text

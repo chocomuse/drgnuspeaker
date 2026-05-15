@@ -39,6 +39,9 @@ class SpeakerConfig:
     device_name: str
     device_token: str
     device_token_path: Path
+    local_pairing_enabled: bool
+    local_pairing_port: int
+    local_pairing_service_type: str
     work_dir: Path
 
     @property
@@ -81,6 +84,12 @@ def load_config() -> SpeakerConfig:
         device_name=os.getenv("DRGNU_DEVICE_NAME", "Drgnu Jetson Speaker").strip(),
         device_token=os.getenv("DRGNU_DEVICE_TOKEN", "").strip(),
         device_token_path=Path(os.getenv("DRGNU_DEVICE_TOKEN_PATH", ".device-token")),
+        local_pairing_enabled=_bool_env("DRGNU_LOCAL_PAIRING_ENABLED", True),
+        local_pairing_port=int(os.getenv("DRGNU_LOCAL_PAIRING_PORT", "8765")),
+        local_pairing_service_type=os.getenv(
+            "DRGNU_LOCAL_PAIRING_SERVICE_TYPE",
+            "_drgnu-speaker._tcp.local.",
+        ).strip(),
         work_dir=Path(os.getenv("DRGNU_WORK_DIR", "/tmp/drgnu-speaker")),
     )
 
