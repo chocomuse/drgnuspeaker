@@ -4,12 +4,29 @@ import json
 import socket
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from dataclasses import dataclass
 from typing import Dict, Optional, Type
 
 from zeroconf import ServiceInfo, Zeroconf
 
 from .config import SpeakerConfig
 from .pairing import DevicePairingClient
+
+
+@dataclass(frozen=True)
+class LocalPairingPayload:
+    device_name: str
+    user_id: str
+    user_name: str
+
+    @classmethod
+    def from_json(cls, raw: bytes, fallback_device_name: str) -> "LocalPairingPayload":
+        payload = json.loads(raw.decode("utf-8"))
+        return cls(
+            device_name=str(payload.get("device_name") or fallback_device_name),
+            user_id=str(payload.get("user_id", "")),
+            user_name=str(payload.get("user_name", "")),
+        )
 
 
 class LocalPairingServer:
@@ -51,14 +68,7 @@ class LocalPairingServer:
                 if self.path != "/info":
                     self._send_json(404, {"error": "not_found"})
                     return
-                self._send_json(
-                    200,
-                    {
-                        "device_id": config.device_id,
-                        "device_name": config.device_name,
-                        "device_type": "jetson_nano_speaker",
-                    },
-                )
+                self._send_json(200, _device_info(config))
 
             def do_POST(self) -> None:
                 if self.path != "/pair":
@@ -66,25 +76,15 @@ class LocalPairingServer:
                     return
 
                 try:
-                    body = self.rfile.read(int(self.headers.get("Content-Length", "0")))
-                    payload = json.loads(body.decode("utf-8"))
-                    device_name = str(payload.get("device_name") or config.device_name)
-                    token = DevicePairingClient(config).claim_local_pairing(
-                        user_id=str(payload.get("user_id", "")),
-                        user_name=str(payload.get("user_name", "")),
-                        device_name=device_name,
-                    )
-                    self._send_json(
-                        200,
-                        {
-                            "linked": True,
-                            "device_id": config.device_id,
-                            "device_name": device_name,
-                            "has_device_token": bool(token),
-                        },
-                    )
+                    payload = self._read_payload()
+                    token = _claim_local_pairing(config, payload)
+                    self._send_json(200, _linked_response(config, payload.device_name, token))
                 except Exception as error:
                     self._send_json(500, {"linked": False, "error": str(error)})
+
+            def _read_payload(self) -> LocalPairingPayload:
+                body = self.rfile.read(int(self.headers.get("Content-Length", "0")))
+                return LocalPairingPayload.from_json(body, config.device_name)
 
             def log_message(self, format: str, *args: object) -> None:
                 print(f"[drgnu-speaker] local pairing: {format % args}", flush=True)
@@ -131,3 +131,28 @@ def _local_ip_address() -> str:
         return str(sock.getsockname()[0])
     finally:
         sock.close()
+
+
+def _device_info(config: SpeakerConfig) -> Dict[str, object]:
+    return {
+        "device_id": config.device_id,
+        "device_name": config.device_name,
+        "device_type": "jetson_nano_speaker",
+    }
+
+
+def _claim_local_pairing(config: SpeakerConfig, payload: LocalPairingPayload) -> str:
+    return DevicePairingClient(config).claim_local_pairing(
+        user_id=payload.user_id,
+        user_name=payload.user_name,
+        device_name=payload.device_name,
+    )
+
+
+def _linked_response(config: SpeakerConfig, device_name: str, token: str) -> Dict[str, object]:
+    return {
+        "linked": True,
+        "device_id": config.device_id,
+        "device_name": device_name,
+        "has_device_token": bool(token),
+    }
