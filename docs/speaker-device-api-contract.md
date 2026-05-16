@@ -236,3 +236,87 @@ GET /api/sessions/{session_id}
 ```
 
 The Android app can keep using `api/get_history` during MVP, then migrate to the session endpoints when the backend is ready.
+
+## Speaker Settings
+
+The Android app and web app update device settings on the backend. The Jetson speaker polls the same settings endpoint and applies changes without a display.
+
+### Get Speaker Settings
+
+Called by Android, web, and Jetson.
+
+```text
+GET /api/devices/{device_id}/settings
+Authorization: Bearer {user_access_token}       # app/web
+Authorization: Bearer {device_access_token}     # Jetson after pairing
+X-Device-Id: {device_id}                        # Jetson
+```
+
+MVP clients can also include:
+
+```text
+X-API-Key: {api_key}
+```
+
+Response:
+
+```json
+{
+  "settings": {
+    "device_name": "Living Room Jinu",
+    "wake_mode": "phrase",
+    "record_seconds": 7,
+    "tts_enabled": true,
+    "mic_muted": false,
+    "local_pairing_enabled": true,
+    "updated_at": "2026-05-16T12:00:00Z"
+  }
+}
+```
+
+### Update Speaker Settings
+
+Called by Android or web after the user changes speaker options.
+
+```text
+PUT /api/devices/{device_id}/settings
+Authorization: Bearer {user_access_token}
+Content-Type: application/json
+```
+
+Request:
+
+```json
+{
+  "device_name": "Living Room Jinu",
+  "wake_mode": "phrase",
+  "record_seconds": 7,
+  "tts_enabled": true,
+  "mic_muted": false,
+  "local_pairing_enabled": true
+}
+```
+
+Response should return the saved settings in the same shape used by `GET`:
+
+```json
+{
+  "settings": {
+    "device_name": "Living Room Jinu",
+    "wake_mode": "phrase",
+    "record_seconds": 7,
+    "tts_enabled": true,
+    "mic_muted": false,
+    "local_pairing_enabled": true,
+    "updated_at": "2026-05-16T12:00:00Z"
+  }
+}
+```
+
+Current Jetson behavior:
+
+- `tts_enabled=false`: the speaker stops reading prompts, answers, and error messages aloud.
+- `mic_muted=true`: the speaker keeps running but does not listen or record.
+- `record_seconds`: controls the length of each captured utterance.
+- `device_name`: stored/displayed by app and server; runtime audio behavior is unchanged.
+- `wake_mode` and `local_pairing_enabled`: included for account sync and future remote restart/service control.

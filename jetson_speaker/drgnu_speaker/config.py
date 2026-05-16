@@ -42,6 +42,8 @@ class SpeakerConfig:
     local_pairing_enabled: bool
     local_pairing_port: int
     local_pairing_service_type: str
+    settings_sync_enabled: bool
+    settings_sync_seconds: float
     work_dir: Path
 
     @property
@@ -55,6 +57,10 @@ class SpeakerConfig:
     @property
     def pairing_status_url(self) -> str:
         return f"{self.base_url.rstrip('/')}/api/devices/pairing-status"
+
+    @property
+    def device_settings_url(self) -> str:
+        return f"{self.base_url.rstrip('/')}/api/devices/{self.device_id}/settings"
 
 
 def load_config() -> SpeakerConfig:
@@ -90,6 +96,8 @@ def load_config() -> SpeakerConfig:
             "DRGNU_LOCAL_PAIRING_SERVICE_TYPE",
             "_drgnu-speaker._tcp.local.",
         ).strip(),
+        settings_sync_enabled=_bool_env("DRGNU_SETTINGS_SYNC_ENABLED", True),
+        settings_sync_seconds=float(os.getenv("DRGNU_SETTINGS_SYNC_SECONDS", "30")),
         work_dir=Path(os.getenv("DRGNU_WORK_DIR", "/tmp/drgnu-speaker")),
     )
 

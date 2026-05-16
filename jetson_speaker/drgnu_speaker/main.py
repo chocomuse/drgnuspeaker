@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import traceback
+import time
 from dataclasses import replace
 
 from .api_client import DrgnuApiClient
@@ -8,6 +9,8 @@ from .audio_io import AudioRecorder
 from .config import load_config
 from .local_pairing import LocalPairingServer
 from .pairing import DevicePairingClient
+from .runtime_settings import DeviceSettings, RuntimeSettings
+from .settings_sync import SettingsSyncWorker
 from .status import SpeakerState, StatusReporter
 from .tts import TextToSpeech
 from .wake_word import build_wake_detector
@@ -27,6 +30,17 @@ def main() -> None:
     device_token = DevicePairingClient(config).ensure_device_token(tts)
     if device_token:
         config = replace(config, device_token=device_token)
+    runtime_settings = RuntimeSettings(
+        DeviceSettings.defaults(
+            device_name=config.device_name,
+            wake_mode=config.wake_mode,
+            record_seconds=config.record_seconds,
+            local_pairing_enabled=config.local_pairing_enabled,
+        )
+    )
+    settings_sync = SettingsSyncWorker(config, runtime_settings)
+    if config.settings_sync_enabled:
+        settings_sync.start()
     wake_detector = build_wake_detector(config)
     recorder = AudioRecorder(config)
     api_client = DrgnuApiClient(config)
@@ -37,27 +51,40 @@ def main() -> None:
     while True:
         try:
             status.set_state(SpeakerState.IDLE)
+            current_settings = runtime_settings.get()
+            if current_settings.mic_muted:
+                print("[drgnu-speaker] microphone is muted by app setting", flush=True)
+                time.sleep(5)
+                continue
             wake_detector.wait_for_wake()
+            current_settings = runtime_settings.get()
+            if current_settings.mic_muted:
+                continue
 
             status.set_state(SpeakerState.LISTENING)
-            tts.speak(READY_MESSAGE)
+            if current_settings.tts_enabled:
+                tts.speak(READY_MESSAGE)
 
             status.set_state(SpeakerState.RECORDING)
-            audio_path = recorder.record_once()
+            audio_path = recorder.record_once(current_settings.record_seconds)
 
             status.set_state(SpeakerState.THINKING)
             result = api_client.analyze_audio(audio_path)
 
             status.set_state(SpeakerState.SPEAKING)
-            tts.speak(result.spoken_summary())
+            if runtime_settings.get().tts_enabled:
+                tts.speak(result.spoken_summary())
         except KeyboardInterrupt:
-            tts.speak(STOP_MESSAGE)
+            settings_sync.stop()
+            if runtime_settings.get().tts_enabled:
+                tts.speak(STOP_MESSAGE)
             local_pairing_server.stop()
             break
         except Exception as error:
             status.set_state(SpeakerState.ERROR)
             print(traceback.format_exc(), flush=True)
-            tts.speak(f"{ERROR_PREFIX} {error}")
+            if runtime_settings.get().tts_enabled:
+                tts.speak(f"{ERROR_PREFIX} {error}")
 
 
 if __name__ == "__main__":

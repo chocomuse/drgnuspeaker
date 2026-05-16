@@ -104,6 +104,43 @@ python -m drgnu_speaker.main
 
 The default `DRGNU_WAKE_MODE=keyboard` waits for Enter instead of a real wake word. This is useful while testing on a desktop or before the wake word model is trained.
 
+## App-Controlled Speaker Settings
+
+After pairing, the Android app can manage basic speaker settings through the backend:
+
+- speaker name
+- TTS on/off
+- microphone mute on/off
+- recording length
+
+The Jetson polls:
+
+```text
+GET {DRGNU_BASE_URL}/api/devices/{DRGNU_DEVICE_ID}/settings
+```
+
+and applies the returned settings while it is running. Configure polling with:
+
+```env
+DRGNU_SETTINGS_SYNC_ENABLED=true
+DRGNU_SETTINGS_SYNC_SECONDS=30
+```
+
+Expected response:
+
+```json
+{
+  "settings": {
+    "device_name": "Living Room Jinu",
+    "wake_mode": "phrase",
+    "record_seconds": 7,
+    "tts_enabled": true,
+    "mic_muted": false,
+    "local_pairing_enabled": true
+  }
+}
+```
+
 ## Enable Phrase Wake Detection
 
 The first real wake mode uses Vosk offline speech recognition with a Korean model. It listens for the default phrases:
