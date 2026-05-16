@@ -207,6 +207,7 @@ audio: wav/m4a audio file
 audiostt_result: same audio file for backward compatibility
 device_id: string
 session_id: user or device session id
+voice_profile_id: optional active voice profile id for STT personalization
 ```
 
 Response:
@@ -269,6 +270,7 @@ Response:
     "tts_enabled": true,
     "mic_muted": false,
     "local_pairing_enabled": true,
+    "active_voice_profile_id": "vp_123",
     "updated_at": "2026-05-16T12:00:00Z"
   }
 }
@@ -293,7 +295,8 @@ Request:
   "record_seconds": 7,
   "tts_enabled": true,
   "mic_muted": false,
-  "local_pairing_enabled": true
+  "local_pairing_enabled": true,
+  "active_voice_profile_id": "vp_123"
 }
 ```
 
@@ -308,6 +311,7 @@ Response should return the saved settings in the same shape used by `GET`:
     "tts_enabled": true,
     "mic_muted": false,
     "local_pairing_enabled": true,
+    "active_voice_profile_id": "vp_123",
     "updated_at": "2026-05-16T12:00:00Z"
   }
 }
@@ -318,5 +322,99 @@ Current Jetson behavior:
 - `tts_enabled=false`: the speaker stops reading prompts, answers, and error messages aloud.
 - `mic_muted=true`: the speaker keeps running but does not listen or record.
 - `record_seconds`: controls the length of each captured utterance.
+- `active_voice_profile_id`: sent with `POST /api/stt-analyze` so the server can use the selected user's voice profile for STT personalization.
 - `device_name`: stored/displayed by app and server; runtime audio behavior is unchanged.
 - `wake_mode` and `local_pairing_enabled`: included for account sync and future remote restart/service control.
+
+## Voice Profiles
+
+Voice profiles are created by the Android app or web app from user-recorded samples. The Jetson does not train a model locally; it sends the active `voice_profile_id` with each analysis request so the backend STT layer can apply user-specific recognition hints or adaptation.
+
+### Create Voice Profile
+
+```text
+POST /api/voice-profiles
+Authorization: Bearer {user_access_token}
+Content-Type: application/json
+```
+
+Request:
+
+```json
+{
+  "profile_name": "My voice",
+  "language": "ko-KR"
+}
+```
+
+Response:
+
+```json
+{
+  "voice_profile": {
+    "voice_profile_id": "vp_123",
+    "profile_name": "My voice",
+    "language": "ko-KR",
+    "status": "collecting_samples",
+    "sample_count": 0
+  }
+}
+```
+
+### Upload Voice Sample
+
+```text
+POST /api/voice-profiles/{voice_profile_id}/samples
+Authorization: Bearer {user_access_token}
+Content-Type: multipart/form-data
+```
+
+Fields:
+
+```text
+audio: wav/m4a audio file
+prompt_text: text the user was asked to read
+```
+
+Response:
+
+```json
+{
+  "voice_profile": {
+    "voice_profile_id": "vp_123",
+    "profile_name": "My voice",
+    "language": "ko-KR",
+    "status": "ready",
+    "sample_count": 5
+  },
+  "sample": {
+    "sample_id": "vs_001",
+    "quality_score": 91
+  }
+}
+```
+
+### List Voice Profiles
+
+```text
+GET /api/users/me/voice-profiles
+Authorization: Bearer {user_access_token}
+```
+
+Response:
+
+```json
+{
+  "voice_profiles": [
+    {
+      "voice_profile_id": "vp_123",
+      "profile_name": "My voice",
+      "language": "ko-KR",
+      "status": "ready",
+      "sample_count": 5
+    }
+  ]
+}
+```
+
+To apply a voice profile to a speaker, update `active_voice_profile_id` through `PUT /api/devices/{device_id}/settings`.

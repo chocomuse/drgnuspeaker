@@ -69,7 +69,10 @@ def main() -> None:
             audio_path = recorder.record_once(current_settings.record_seconds)
 
             status.set_state(SpeakerState.THINKING)
-            result = api_client.analyze_audio(audio_path)
+            result = api_client.analyze_audio(
+                audio_path,
+                voice_profile_id=current_settings.active_voice_profile_id,
+            )
 
             status.set_state(SpeakerState.SPEAKING)
             if runtime_settings.get().tts_enabled:

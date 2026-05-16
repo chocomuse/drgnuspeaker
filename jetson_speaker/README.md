@@ -136,10 +136,13 @@ Expected response:
     "record_seconds": 7,
     "tts_enabled": true,
     "mic_muted": false,
-    "local_pairing_enabled": true
+    "local_pairing_enabled": true,
+    "active_voice_profile_id": "vp_123"
   }
 }
 ```
+
+When `active_voice_profile_id` is present, the Jetson includes it in `POST /api/stt-analyze` so the backend can use the selected user's voice profile to improve STT recognition.
 
 ## Enable Phrase Wake Detection
 
@@ -220,6 +223,7 @@ Fields:
   audiostt_result: wav file
   device_id: string
   session_id: string
+  voice_profile_id: optional voice profile id
 ```
 
 It accepts the same broad response fields used by the Android app:

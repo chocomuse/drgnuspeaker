@@ -13,6 +13,7 @@ class DeviceSettings:
     tts_enabled: bool
     mic_muted: bool
     local_pairing_enabled: bool
+    active_voice_profile_id: str
 
     @classmethod
     def defaults(
@@ -29,6 +30,7 @@ class DeviceSettings:
             tts_enabled=True,
             mic_muted=False,
             local_pairing_enabled=local_pairing_enabled,
+            active_voice_profile_id="",
         )
 
     @classmethod
@@ -47,6 +49,11 @@ class DeviceSettings:
                 payload.get("local_pairing_enabled"),
                 fallback.local_pairing_enabled,
             ),
+            active_voice_profile_id=str(
+                payload.get("active_voice_profile_id")
+                or payload.get("voice_profile_id")
+                or fallback.active_voice_profile_id
+            ).strip(),
         )
 
 
