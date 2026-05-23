@@ -185,16 +185,38 @@ You can override phrases with `DRGNU_WAKE_PHRASES`, separated by commas. Leave i
 
 ## Run On Boot
 
-Copy the systemd unit:
+After the app runs manually, install the systemd autostart service:
 
 ```bash
-sudo cp systemd/drgnu-speaker.service /etc/systemd/system/drgnu-speaker.service
-sudo systemctl daemon-reload
-sudo systemctl enable drgnu-speaker
-sudo systemctl start drgnu-speaker
+cd jetson_speaker
+chmod +x scripts/install_autostart.sh
+./scripts/install_autostart.sh
 ```
 
-Adjust paths and the `User=` value in the unit file for your Jetson user.
+The installer detects the current folder and Linux user, writes `/etc/systemd/system/drgnu-speaker.service`, enables it, and starts it immediately.
+
+Check the service:
+
+```bash
+sudo systemctl status drgnu-speaker
+```
+
+Watch logs:
+
+```bash
+journalctl -u drgnu-speaker -f
+```
+
+After this, the speaker starts automatically whenever the Jetson Nano boots. Make sure Wi-Fi, microphone, speaker output, `.env`, and `.venv` are already configured before installing autostart.
+
+To disable boot autostart:
+
+```bash
+chmod +x scripts/uninstall_autostart.sh
+./scripts/uninstall_autostart.sh
+```
+
+If you prefer manual setup, copy `systemd/drgnu-speaker.service` to `/etc/systemd/system/` and adjust `User=`, `WorkingDirectory=`, `EnvironmentFile=`, and `ExecStart=` for your Jetson path.
 
 ## Wake Word Roadmap
 
