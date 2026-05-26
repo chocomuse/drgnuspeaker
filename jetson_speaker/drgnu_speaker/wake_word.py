@@ -21,7 +21,10 @@ class WakeDetector(ABC):
 
 class KeyboardWakeDetector(WakeDetector):
     def wait_for_wake(self) -> None:
-        input("Press Enter to simulate wake word: ")
+        try:
+            input("Press Enter to simulate wake word: ")
+        except EOFError as error:
+            raise KeyboardInterrupt from error
 
 
 class ButtonWakeDetector(WakeDetector):

@@ -104,6 +104,37 @@ python -m drgnu_speaker.main
 
 The default `DRGNU_WAKE_MODE=keyboard` waits for Enter instead of a real wake word. This is useful while testing on a desktop or before the wake word model is trained.
 
+## Test On Windows Before Jetson
+
+You can test recording, upload, and response handling on Windows before moving to the Jetson Nano.
+
+Install dependencies:
+
+```powershell
+cd jetson_speaker
+python -m pip install --user -r requirements.txt
+```
+
+Use the local mock server config:
+
+```powershell
+copy .env.windows-test.example .env
+```
+
+Start the mock server in one terminal:
+
+```powershell
+python scripts/mock_stt_server.py
+```
+
+Run the speaker in another terminal:
+
+```powershell
+python -m drgnu_speaker.main
+```
+
+Press Enter when prompted, speak for a few seconds, and the mock server returns a test answer. This verifies the microphone recording path and `POST /api/stt-analyze` upload flow without needing the real backend.
+
 ## App-Controlled Speaker Settings
 
 After pairing, the Android app can manage basic speaker settings through the backend:

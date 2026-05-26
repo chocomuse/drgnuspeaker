@@ -10,3 +10,5 @@ dist/
 build/
 *.egg-info/
 jetson_speaker/models/
+jetson_speaker/.tmp/
+jetson_speaker/tmp/
