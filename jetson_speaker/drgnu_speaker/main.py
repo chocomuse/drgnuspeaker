@@ -14,6 +14,8 @@ from .settings_sync import SettingsSyncWorker
 from .status import SpeakerState, StatusReporter
 from .tts import TextToSpeech
 from .wake_word import build_wake_detector
+from .wifi_provisioner import WifiProvisioner
+
 
 
 START_MESSAGE = "\uc9c0\ub204 \uc2a4\ud53c\ucee4\ub97c \uc2dc\uc791\ud569\ub2c8\ub2e4."
@@ -25,11 +27,29 @@ ERROR_PREFIX = "\ucc98\ub9ac \uc911 \uc624\ub958\uac00 \ubc1c\uc0dd\ud588\uc2b5\
 def main() -> None:
     config = load_config()
     tts = TextToSpeech(config.tts_command)
+    
+    # Headless Wi-Fi setup if disconnected
+    WifiProvisioner(config, tts).ensure_connected()
+    
     local_pairing_server = LocalPairingServer(config)
     local_pairing_server.start()
+
     device_token = DevicePairingClient(config).ensure_device_token(tts)
     if device_token:
-        config = replace(config, device_token=device_token)
+        user_info_path = config.device_token_path.parent / ".user-info"
+        if user_info_path.exists():
+            try:
+                import json
+                info = json.loads(user_info_path.read_text(encoding="utf-8"))
+                if info.get("user_id"):
+                    config = replace(config, device_token=device_token, session_id=info["user_id"])
+                    print(f"[drgnu-speaker] Dynamic pairing update: session_id set to user_id = {info['user_id']}", flush=True)
+                else:
+                    config = replace(config, device_token=device_token)
+            except Exception:
+                config = replace(config, device_token=device_token)
+        else:
+            config = replace(config, device_token=device_token)
     runtime_settings = RuntimeSettings(
         DeviceSettings.defaults(
             device_name=config.device_name,
@@ -76,7 +96,30 @@ def main() -> None:
 
             status.set_state(SpeakerState.SPEAKING)
             if runtime_settings.get().tts_enabled:
-                tts.speak(result.spoken_summary())
+                # Speak the main answer immediately
+                if result.answer:
+                    tts.speak(result.answer)
+                
+                # Speak the score and risk level afterward (omitting the reason)
+                score_details = []
+                if result.score is not None:
+                    score_details.append(f"상태 점수는 {result.score}점입니다.")
+                if result.risk_level:
+                    risk_label = result.risk_level
+                    if risk_label.lower() == "normal":
+                        risk_label = "정상"
+                    elif risk_label.lower() == "low risk":
+                        risk_label = "낮은위험"
+                    elif risk_label.lower() == "caution":
+                        risk_label = "주의"
+                    elif risk_label.lower() == "risk":
+                        risk_label = "위험"
+                    elif risk_label.lower() == "high risk" or risk_label.lower() == "very risk":
+                        risk_label = "매우위험"
+                    score_details.append(f"위험도는 {risk_label}입니다.")
+                
+                if score_details:
+                    tts.speak(" ".join(score_details))
         except KeyboardInterrupt:
             settings_sync.stop()
             if runtime_settings.get().tts_enabled:

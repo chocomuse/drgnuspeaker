@@ -9,13 +9,23 @@ from dotenv import load_dotenv
 
 
 DEFAULT_WAKE_PHRASES = (
-    "\uc9c0\ub204\uc57c",
-    "\uc9c4\uc6b0\uc57c",
-    "\ud5e4\uc774 \uc9c0\ub204",
-    "\ud5e4\uc774 \uc9c4\uc6b0",
+    "지누야",
+    "진우야",
+    "지이누야",
+    "이누야",
+    "지우야",
+    "기누야",
+    "지누",
+    "진우",
+    "지우",
+    "이누",
+    "기누",
+    "헤이 지누",
+    "헤이 진우",
     "hey jinu",
     "hey ginu",
 )
+
 
 
 @dataclass(frozen=True)
@@ -45,6 +55,10 @@ class SpeakerConfig:
     settings_sync_enabled: bool
     settings_sync_seconds: float
     work_dir: Path
+    hotspot_ssid_prefix: str
+    hotspot_password: str
+    hotspot_port: int
+
 
     @property
     def analysis_url(self) -> str:
@@ -65,11 +79,27 @@ class SpeakerConfig:
 
 def load_config() -> SpeakerConfig:
     load_dotenv()
+    
+    device_token_path = Path(os.getenv("DRGNU_DEVICE_TOKEN_PATH", ".device-token"))
+    resolved_token_path = device_token_path if device_token_path.is_absolute() else Path.cwd() / device_token_path
+    user_info_path = resolved_token_path.parent / ".user-info"
+    
+    session_id = os.getenv("DRGNU_SESSION_ID", "test_user_001")
+    if user_info_path.exists():
+        try:
+            import json
+            info = json.loads(user_info_path.read_text(encoding="utf-8"))
+            if info.get("user_id"):
+                session_id = info["user_id"]
+                print(f"[drgnu-speaker] Loaded session_id (user_id) from user info: {session_id}", flush=True)
+        except Exception as e:
+            print(f"[drgnu-speaker] Failed to load user info: {e}", flush=True)
+
     return SpeakerConfig(
         base_url=_required_env("DRGNU_BASE_URL"),
         api_key=_required_env("DRGNU_API_KEY"),
         device_id=os.getenv("DRGNU_DEVICE_ID", "jetson-nano-dev-001"),
-        session_id=os.getenv("DRGNU_SESSION_ID", "test_user_001"),
+        session_id=session_id,
         wake_mode=os.getenv("DRGNU_WAKE_MODE", "keyboard").strip().lower(),
         record_seconds=float(os.getenv("DRGNU_RECORD_SECONDS", "7")),
         sample_rate=int(os.getenv("DRGNU_SAMPLE_RATE", "16000")),
@@ -89,7 +119,7 @@ def load_config() -> SpeakerConfig:
         pairing_poll_seconds=float(os.getenv("DRGNU_PAIRING_POLL_SECONDS", "3")),
         device_name=os.getenv("DRGNU_DEVICE_NAME", "Drgnu Jetson Speaker").strip(),
         device_token=os.getenv("DRGNU_DEVICE_TOKEN", "").strip(),
-        device_token_path=Path(os.getenv("DRGNU_DEVICE_TOKEN_PATH", ".device-token")),
+        device_token_path=device_token_path,
         local_pairing_enabled=_bool_env("DRGNU_LOCAL_PAIRING_ENABLED", True),
         local_pairing_port=int(os.getenv("DRGNU_LOCAL_PAIRING_PORT", "8765")),
         local_pairing_service_type=os.getenv(
@@ -99,7 +129,11 @@ def load_config() -> SpeakerConfig:
         settings_sync_enabled=_bool_env("DRGNU_SETTINGS_SYNC_ENABLED", True),
         settings_sync_seconds=float(os.getenv("DRGNU_SETTINGS_SYNC_SECONDS", "30")),
         work_dir=Path(os.getenv("DRGNU_WORK_DIR", "/tmp/drgnu-speaker")),
+        hotspot_ssid_prefix=os.getenv("DRGNU_HOTSPOT_SSID_PREFIX", "Drgnu-Speaker-").strip(),
+        hotspot_password=os.getenv("DRGNU_HOTSPOT_PASSWORD", "drgnuspeaker").strip(),
+        hotspot_port=int(os.getenv("DRGNU_HOTSPOT_PORT", "80")),
     )
+
 
 
 def _required_env(name: str) -> str:

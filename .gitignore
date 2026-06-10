@@ -1,5 +1,6 @@
 .env
 .device-token
+.user-info
 .venv/
 __pycache__/
 *.py[cod]

@@ -18,14 +18,16 @@ class LocalPairingPayload:
     device_name: str
     user_id: str
     user_name: str
+    auth_token: str
 
     @classmethod
     def from_json(cls, raw: bytes, fallback_device_name: str) -> "LocalPairingPayload":
         payload = json.loads(raw.decode("utf-8"))
         return cls(
             device_name=str(payload.get("device_name") or fallback_device_name),
-            user_id=str(payload.get("user_id", "")),
-            user_name=str(payload.get("user_name", "")),
+            user_id=str(payload.get("user_id") or payload.get("userId", "")),
+            user_name=str(payload.get("user_name") or payload.get("userName", "")),
+            auth_token=str(payload.get("auth_token", "")),
         )
 
 
@@ -146,6 +148,7 @@ def _claim_local_pairing(config: SpeakerConfig, payload: LocalPairingPayload) ->
         user_id=payload.user_id,
         user_name=payload.user_name,
         device_name=payload.device_name,
+        auth_token=payload.auth_token,
     )
 
 

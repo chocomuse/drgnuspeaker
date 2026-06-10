@@ -36,6 +36,21 @@ class DrgnuApiClient:
             self._session.headers.update({"Authorization": f"Bearer {config.device_token}"})
 
     def analyze_audio(self, audio_path: Path, voice_profile_id: str = "") -> AnalysisResult:
+        device_token_path = self._config.device_token_path
+        resolved_token_path = device_token_path if device_token_path.is_absolute() else Path.cwd() / device_token_path
+        user_info_path = resolved_token_path.parent / ".user-info"
+        
+        user_id = ""
+        user_name = ""
+        if user_info_path.exists():
+            try:
+                import json
+                info = json.loads(user_info_path.read_text(encoding="utf-8"))
+                user_id = info.get("user_id", "")
+                user_name = info.get("user_name", "")
+            except Exception:
+                pass
+
         with audio_path.open("rb") as audio_file, audio_path.open("rb") as stt_file:
             files = {
                 "audio": (audio_path.name, audio_file, "audio/wav"),
@@ -44,9 +59,17 @@ class DrgnuApiClient:
             data = {
                 "device_id": self._config.device_id,
                 "session_id": self._config.session_id,
+                "source": "speaker",
             }
+            if user_id:
+                data["user_id"] = user_id
+                data["userId"] = user_id
+            if user_name:
+                data["user_name"] = user_name
+                data["username"] = user_name
             if voice_profile_id:
                 data["voice_profile_id"] = voice_profile_id
+                
             response = self._session.post(
                 self._config.analysis_url,
                 data=data,

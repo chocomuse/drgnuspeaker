@@ -9,5 +9,7 @@ sudo apt-get install -y \
   libsndfile1 \
   alsa-utils \
   speech-dispatcher \
+  mpg123 \
   unzip \
   wget
+

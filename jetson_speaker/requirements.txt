@@ -4,3 +4,6 @@ sounddevice==0.4.7
 soundfile==0.12.1
 vosk==0.3.45
 zeroconf==0.132.2
+gTTS==2.5.1
+numpy
+

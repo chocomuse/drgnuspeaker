@@ -54,15 +54,32 @@ class VoskPhraseWakeDetector(WakeDetector):
 
     def wait_for_wake(self) -> None:
         from vosk import KaldiRecognizer
+        import json
 
-        recognizer = KaldiRecognizer(self._model, self._sample_rate)
+        # Restrict Vosk vocabulary to only target wake phrases and unknown sounds ([unk]).
+        # This dramatically reduces false positives and boosts wake word detection accuracy.
+        grammar = [
+            "지누야", "진우야", "지누 야", "진우 야", "지 이누야", "이누야", "이누 야",
+            "지우야", "지우 야", "기누야", "기누 야", "지누", "진우", "지우", "이누", "기누",
+            "헤이 지누", "헤이 진우", "hey jinu", "hey ginu", "[unk]"
+        ]
+        grammar_json = json.dumps(grammar, ensure_ascii=False)
+        recognizer = KaldiRecognizer(self._model, self._sample_rate, grammar_json)
         audio_queue: "queue.Queue[bytes]" = queue.Queue()
         started_at = time.monotonic()
+
 
         def callback(indata: bytes, frames: int, time_info: object, status: object) -> None:
             if status:
                 print(f"[drgnu-speaker] wake audio status={status}", flush=True)
             audio_queue.put(bytes(indata))
+
+        try:
+            default_device = sd.query_devices(kind='input')
+            device_name = default_device.get('name', 'Unknown')
+            print(f"[drgnu-speaker] default input device: {device_name}", flush=True)
+        except Exception as e:
+            print(f"[drgnu-speaker] failed to query input devices: {e}", flush=True)
 
         print("[drgnu-speaker] listening for wake phrase", flush=True)
         with sd.RawInputStream(
@@ -79,12 +96,17 @@ class VoskPhraseWakeDetector(WakeDetector):
                 data = audio_queue.get()
                 if recognizer.AcceptWaveform(data):
                     text = json.loads(recognizer.Result()).get("text", "")
+                    if text.strip():
+                        print(f"\n[인식된 문장]: {text}", flush=True)
                     if self._contains_wake_phrase(text):
                         return
                 else:
                     partial = json.loads(recognizer.PartialResult()).get("partial", "")
+                    if partial.strip():
+                        print(f"[음성 감지 중...]: {partial}      ", end="\r", flush=True)
                     if self._contains_wake_phrase(partial):
                         return
+
 
     def _contains_wake_phrase(self, text: str) -> bool:
         normalized = _normalize_text(text)
