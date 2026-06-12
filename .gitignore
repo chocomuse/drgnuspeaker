@@ -1,6 +1,10 @@
 .env
 .device-token
 .user-info
+google-services.json
+*service-account*.json
+drgnu-project-*.json
+google-cloud-*.json
 .venv/
 __pycache__/
 *.py[cod]

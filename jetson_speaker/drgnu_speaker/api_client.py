@@ -35,7 +35,7 @@ class DrgnuApiClient:
         if config.device_token:
             self._session.headers.update({"Authorization": f"Bearer {config.device_token}"})
 
-    def analyze_audio(self, audio_path: Path, voice_profile_id: str = "") -> AnalysisResult:
+    def analyze_audio(self, audio_path: Path, voice_profile_id: str = "", local_stt: str = "") -> AnalysisResult:
         device_token_path = self._config.device_token_path
         resolved_token_path = device_token_path if device_token_path.is_absolute() else Path.cwd() / device_token_path
         user_info_path = resolved_token_path.parent / ".user-info"
@@ -69,6 +69,10 @@ class DrgnuApiClient:
                 data["username"] = user_name
             if voice_profile_id:
                 data["voice_profile_id"] = voice_profile_id
+            if local_stt:
+                data["local_stt"] = local_stt
+                data["stt"] = local_stt
+                data["transcript"] = local_stt
                 
             response = self._session.post(
                 self._config.analysis_url,

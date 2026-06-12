@@ -15,6 +15,7 @@ from .status import SpeakerState, StatusReporter
 from .tts import TextToSpeech
 from .wake_word import build_wake_detector
 from .wifi_provisioner import WifiProvisioner
+from .stt import GoogleSpeechClient
 
 
 
@@ -64,6 +65,7 @@ def main() -> None:
     wake_detector = build_wake_detector(config)
     recorder = AudioRecorder(config)
     api_client = DrgnuApiClient(config)
+    google_stt_client = GoogleSpeechClient(config)
     status = StatusReporter()
 
     tts.speak(START_MESSAGE)
@@ -89,9 +91,13 @@ def main() -> None:
             audio_path = recorder.record_once(current_settings.record_seconds)
 
             status.set_state(SpeakerState.THINKING)
+            
+            local_stt = google_stt_client.transcribe(audio_path)
+
             result = api_client.analyze_audio(
                 audio_path,
                 voice_profile_id=current_settings.active_voice_profile_id,
+                local_stt=local_stt,
             )
 
             status.set_state(SpeakerState.SPEAKING)

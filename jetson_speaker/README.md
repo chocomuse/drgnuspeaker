@@ -37,6 +37,60 @@ Edit `.env` and set:
 - `DRGNU_DEVICE_ID`
 - `DRGNU_SESSION_ID`
 
+## Jetson Nano Quick Start
+
+On Jetson Nano, use the Linux shell scripts instead of the Windows `.bat` files.
+
+```bash
+git clone https://github.com/chocomuse/drgnuspeaker.git
+cd drgnuspeaker/jetson_speaker
+chmod +x scripts/setup_jetson.sh
+./scripts/setup_jetson.sh
+```
+
+Then edit `.env`:
+
+```bash
+nano .env
+```
+
+Required values for the Google STT wake flow:
+
+```env
+DRGNU_BASE_URL=https://aidrgnu.com/
+DRGNU_API_KEY=replace-with-server-api-key
+DRGNU_DEVICE_ID=jetson-nano-001
+DRGNU_DEVICE_NAME=Jetson Nano Speaker
+DRGNU_WAKE_MODE=google_stt
+DRGNU_WAKE_STT_SECONDS=2.0
+DRGNU_WAKE_STT_PAUSE_SECONDS=0.2
+DRGNU_GOOGLE_STT_ENABLED=true
+DRGNU_GOOGLE_STT_LANGUAGE_CODE=ko-KR
+DRGNU_GOOGLE_SERVICE_ACCOUNT_JSON=/home/jetson/drgnuspeaker/jetson_speaker/drgnu-project-06c2709995a2.json
+DRGNU_TTS_COMMAND=python scripts/gtts_speak.py
+```
+
+Copy the Google service account JSON to the Jetson path you set in `DRGNU_GOOGLE_SERVICE_ACCOUNT_JSON`. Do not commit this JSON file to GitHub.
+
+Run manually:
+
+```bash
+./run_speaker.sh
+```
+
+After manual testing works, enable boot autostart:
+
+```bash
+chmod +x scripts/install_autostart.sh
+./scripts/install_autostart.sh
+```
+
+Check service logs:
+
+```bash
+journalctl -u drgnu-speaker -f
+```
+
 ## Pair With The Android App
 
 ### Option A: Nearby Speaker Discovery
@@ -103,6 +157,35 @@ python -m drgnu_speaker.main
 ```
 
 The default `DRGNU_WAKE_MODE=keyboard` waits for Enter instead of a real wake word. This is useful while testing on a desktop or before the wake word model is trained.
+
+## Enable Google Speech-to-Text
+
+The speaker can transcribe recorded WAV audio with Google Cloud Speech-to-Text before sending the request to the Drgnu backend. Enable the Speech-to-Text API in Google Cloud, then configure one of these options in `.env`:
+
+```env
+DRGNU_GOOGLE_STT_ENABLED=true
+DRGNU_GOOGLE_STT_LANGUAGE_CODE=ko-KR
+DRGNU_GOOGLE_STT_API_KEY=your-google-cloud-api-key
+```
+
+Or place `google-services.json` in `jetson_speaker/` and point to it:
+
+```env
+DRGNU_GOOGLE_STT_ENABLED=true
+DRGNU_GOOGLE_SERVICES_JSON=google-services.json
+```
+
+The client sends the recognized text to the backend as `local_stt`, `stt`, and `transcript`, while still attaching the original WAV file.
+
+To use Google STT for wake phrase detection too, set:
+
+```env
+DRGNU_WAKE_MODE=google_stt
+DRGNU_WAKE_STT_SECONDS=2.0
+DRGNU_WAKE_STT_PAUSE_SECONDS=0.2
+```
+
+In this mode the speaker records short wake-listening clips, sends each clip to Google STT, and wakes only when the transcript contains a configured wake phrase such as `지누야`, `진우야`, `헤이 지누`, or `hey jinu`. This is more accurate than the local Vosk prototype, but it needs internet access and can use more Google STT quota because it checks repeatedly while waiting.
 
 ## Test On Windows Before Jetson
 
@@ -277,6 +360,9 @@ Fields:
   device_id: string
   session_id: string
   voice_profile_id: optional voice profile id
+  local_stt: optional Google STT transcript
+  stt: optional Google STT transcript
+  transcript: optional Google STT transcript
 ```
 
 It accepts the same broad response fields used by the Android app:

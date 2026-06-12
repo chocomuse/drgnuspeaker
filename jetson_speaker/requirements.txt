@@ -5,5 +5,5 @@ soundfile==0.12.1
 vosk==0.3.45
 zeroconf==0.132.2
 gTTS==2.5.1
+google-auth==2.35.0
 numpy
-

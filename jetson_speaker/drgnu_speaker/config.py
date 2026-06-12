@@ -44,6 +44,8 @@ class SpeakerConfig:
     wake_model_path: Path
     wake_phrases: Tuple[str, ...]
     wake_timeout_seconds: float
+    wake_stt_seconds: float
+    wake_stt_pause_seconds: float
     pairing_enabled: bool
     pairing_poll_seconds: float
     device_name: str
@@ -58,6 +60,11 @@ class SpeakerConfig:
     hotspot_ssid_prefix: str
     hotspot_password: str
     hotspot_port: int
+    google_stt_enabled: bool
+    google_stt_api_key: str
+    google_stt_language_code: str
+    google_services_json: Optional[Path]
+    google_service_account_json: Optional[Path]
 
 
     @property
@@ -115,6 +122,8 @@ def load_config() -> SpeakerConfig:
         ),
         wake_phrases=_configured_wake_phrases(),
         wake_timeout_seconds=float(os.getenv("DRGNU_WAKE_TIMEOUT_SECONDS", "0")),
+        wake_stt_seconds=float(os.getenv("DRGNU_WAKE_STT_SECONDS", "2.0")),
+        wake_stt_pause_seconds=float(os.getenv("DRGNU_WAKE_STT_PAUSE_SECONDS", "0.2")),
         pairing_enabled=_bool_env("DRGNU_PAIRING_ENABLED", False),
         pairing_poll_seconds=float(os.getenv("DRGNU_PAIRING_POLL_SECONDS", "3")),
         device_name=os.getenv("DRGNU_DEVICE_NAME", "Drgnu Jetson Speaker").strip(),
@@ -132,6 +141,11 @@ def load_config() -> SpeakerConfig:
         hotspot_ssid_prefix=os.getenv("DRGNU_HOTSPOT_SSID_PREFIX", "Drgnu-Speaker-").strip(),
         hotspot_password=os.getenv("DRGNU_HOTSPOT_PASSWORD", "drgnuspeaker").strip(),
         hotspot_port=int(os.getenv("DRGNU_HOTSPOT_PORT", "80")),
+        google_stt_enabled=_bool_env("DRGNU_GOOGLE_STT_ENABLED", False),
+        google_stt_api_key=os.getenv("DRGNU_GOOGLE_STT_API_KEY", "").strip(),
+        google_stt_language_code=os.getenv("DRGNU_GOOGLE_STT_LANGUAGE_CODE", "ko-KR").strip(),
+        google_services_json=_optional_path("DRGNU_GOOGLE_SERVICES_JSON"),
+        google_service_account_json=_optional_path("DRGNU_GOOGLE_SERVICE_ACCOUNT_JSON"),
     )
 
 
@@ -148,6 +162,13 @@ def _optional_int(name: str) -> Optional[int]:
     if not value:
         return None
     return int(value)
+
+
+def _optional_path(name: str) -> Optional[Path]:
+    value = os.getenv(name, "").strip()
+    if not value:
+        return None
+    return Path(value).expanduser()
 
 
 def _bool_env(name: str, default: bool) -> bool:

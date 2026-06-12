@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import tempfile
 import queue
 import re
 import time
@@ -9,8 +10,10 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 import sounddevice as sd
+import soundfile as sf
 
 from .config import SpeakerConfig
+from .stt import GoogleSpeechClient
 
 
 class WakeDetector(ABC):
@@ -35,6 +38,83 @@ class ButtonWakeDetector(WakeDetector):
         if self._gpio_pin is None:
             raise RuntimeError("DRGNU_PTT_GPIO_PIN is required for button wake mode")
         raise NotImplementedError("GPIO button wake mode will be wired in the Jetson hardware pass")
+
+
+class GoogleSttWakeDetector(WakeDetector):
+    def __init__(self, config: SpeakerConfig) -> None:
+        self._config = config
+        self._stt = GoogleSpeechClient(config)
+        self._phrases = tuple(
+            phrase
+            for phrase in (_normalize_text(item) for item in config.wake_phrases)
+            if len(phrase) >= 3 or phrase.startswith("hey")
+        )
+
+    def wait_for_wake(self) -> None:
+        if not self._stt.enabled:
+            raise RuntimeError(
+                "Google STT wake mode requires DRGNU_GOOGLE_STT_ENABLED=true and valid Google credentials"
+            )
+
+        started_at = time.monotonic()
+        print("[drgnu-speaker] listening for wake phrase with Google STT", flush=True)
+        while True:
+            if self._config.wake_timeout_seconds > 0:
+                elapsed = time.monotonic() - started_at
+                if elapsed > self._config.wake_timeout_seconds:
+                    raise TimeoutError("Wake phrase was not detected before timeout")
+
+            audio_path = self._record_wake_clip()
+            try:
+                text = self._stt.transcribe(audio_path)
+            finally:
+                try:
+                    audio_path.unlink()
+                except OSError:
+                    pass
+
+            if text:
+                print(f"[drgnu-speaker] wake stt heard: {text}", flush=True)
+            if self._contains_wake_phrase(text):
+                return
+
+            if self._config.wake_stt_pause_seconds > 0:
+                time.sleep(self._config.wake_stt_pause_seconds)
+
+    def _record_wake_clip(self) -> Path:
+        duration = max(0.5, self._config.wake_stt_seconds)
+        sample_rate = self._config.sample_rate
+        channels = self._config.channels
+        frame_count = int(sample_rate * duration)
+
+        audio = sd.rec(
+            frame_count,
+            samplerate=sample_rate,
+            channels=channels,
+            dtype="int16",
+        )
+        sd.wait()
+
+        self._config.work_dir.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(
+            prefix="drgnu_wake_",
+            suffix=".wav",
+            dir=self._config.work_dir,
+            delete=False,
+        ) as temp_file:
+            output_path = Path(temp_file.name)
+        sf.write(output_path, audio, sample_rate)
+        return output_path
+
+    def _contains_wake_phrase(self, text: str) -> bool:
+        normalized = _normalize_text(text)
+        if not normalized:
+            return False
+        matched_phrase = next((phrase for phrase in self._phrases if phrase in normalized), "")
+        if matched_phrase:
+            print(f"[drgnu-speaker] Google STT wake phrase matched: {text}", flush=True)
+            return True
+        return False
 
 
 class VoskPhraseWakeDetector(WakeDetector):
@@ -143,6 +223,8 @@ def build_wake_detector(config: SpeakerConfig) -> WakeDetector:
         return KeyboardWakeDetector()
     if config.wake_mode == "button":
         return ButtonWakeDetector(config.ptt_gpio_pin)
+    if config.wake_mode in ("google_stt", "stt", "google"):
+        return GoogleSttWakeDetector(config)
     if config.wake_mode in ("phrase", "vosk"):
         return VoskPhraseWakeDetector(
             model_path=config.wake_model_path,
