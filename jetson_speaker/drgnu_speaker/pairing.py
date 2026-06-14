@@ -129,6 +129,14 @@ class DevicePairingClient:
             self._save_user_info(user_id, user_name)
             return token
 
+    def clear_local_pairing(self) -> dict[str, bool]:
+        token_removed = self._remove_file(self._token_path())
+        user_info_removed = self._remove_file(self._token_path().parent / ".user-info")
+        return {
+            "device_token_removed": token_removed,
+            "user_info_removed": user_info_removed,
+        }
+
 
     def _load_existing_token(self) -> str:
         if self._config.device_token:
@@ -157,3 +165,12 @@ class DevicePairingClient:
         if path.is_absolute():
             return path
         return Path.cwd() / path
+
+    def _remove_file(self, path: Path) -> bool:
+        try:
+            if path.exists():
+                path.unlink()
+                return True
+        except OSError as error:
+            print(f"[drgnu-speaker] failed to remove pairing file {path}: {error}", flush=True)
+        return False

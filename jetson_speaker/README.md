@@ -122,6 +122,14 @@ Backend endpoint required:
 POST /api/devices/link-local
 ```
 
+When the Android app disconnects the speaker, call the Jetson local unlink endpoint:
+
+```text
+POST http://{speaker-ip}:8765/unlink
+```
+
+The speaker deletes `.device-token` and `.user-info`. The aliases `/unpair` and `/disconnect` are also accepted.
+
 ### Option B: Spoken Pairing Code
 
 When `DRGNU_PAIRING_ENABLED=true` and no device token exists, the speaker calls:

@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional
+import os
 
 import requests
 
@@ -36,6 +37,7 @@ class DrgnuApiClient:
             self._session.headers.update({"Authorization": f"Bearer {config.device_token}"})
 
     def analyze_audio(self, audio_path: Path, voice_profile_id: str = "", local_stt: str = "") -> AnalysisResult:
+        self._sync_authorization_header()
         device_token_path = self._config.device_token_path
         resolved_token_path = device_token_path if device_token_path.is_absolute() else Path.cwd() / device_token_path
         user_info_path = resolved_token_path.parent / ".user-info"
@@ -83,6 +85,20 @@ class DrgnuApiClient:
         response.raise_for_status()
         payload = response.json()
         return _parse_analysis_result(payload)
+
+    def _sync_authorization_header(self) -> None:
+        token = self._current_device_token()
+        if token:
+            self._session.headers.update({"Authorization": f"Bearer {token}"})
+        else:
+            self._session.headers.pop("Authorization", None)
+
+    def _current_device_token(self) -> str:
+        token_path = self._config.device_token_path
+        resolved_token_path = token_path if token_path.is_absolute() else Path.cwd() / token_path
+        if resolved_token_path.exists():
+            return resolved_token_path.read_text(encoding="utf-8").strip()
+        return os.getenv("DRGNU_DEVICE_TOKEN", "").strip()
 
 
 def _parse_analysis_result(payload: Dict[str, Any]) -> AnalysisResult:

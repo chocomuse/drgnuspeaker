@@ -91,6 +91,32 @@ Response:
 
 The Jetson stores `device_access_token` locally in `.device-token`.
 
+### Local Unlink
+
+Called by the Android app when the user disconnects a local speaker. The Jetson deletes its local pairing files so the next run starts unpaired.
+
+```text
+POST http://{speaker-ip}:8765/unlink
+```
+
+Accepted aliases:
+
+```text
+POST http://{speaker-ip}:8765/unpair
+POST http://{speaker-ip}:8765/disconnect
+```
+
+Response:
+
+```json
+{
+  "linked": false,
+  "cleared": true,
+  "device_token_removed": true,
+  "user_info_removed": true
+}
+```
+
 ### Create Pairing Code
 
 Called by the Jetson when it is not linked to an account.

@@ -73,16 +73,26 @@ class LocalPairingServer:
                 self._send_json(200, _device_info(config))
 
             def do_POST(self) -> None:
-                if self.path != "/pair":
-                    self._send_json(404, {"error": "not_found"})
+                if self.path == "/pair":
+                    try:
+                        payload = self._read_payload()
+                        token = _claim_local_pairing(config, payload)
+                        self._send_json(200, _linked_response(config, payload.device_name, token))
+                    except Exception as error:
+                        self._send_json(500, {"linked": False, "error": str(error)})
                     return
 
-                try:
-                    payload = self._read_payload()
-                    token = _claim_local_pairing(config, payload)
-                    self._send_json(200, _linked_response(config, payload.device_name, token))
-                except Exception as error:
-                    self._send_json(500, {"linked": False, "error": str(error)})
+                if self.path in ("/unlink", "/unpair", "/disconnect"):
+                    try:
+                        result = _clear_local_pairing(config)
+                        self._send_json(200, {"linked": False, "cleared": True, **result})
+                    except Exception as error:
+                        self._send_json(500, {"linked": True, "cleared": False, "error": str(error)})
+                    return
+
+                else:
+                    self._send_json(404, {"error": "not_found"})
+                    return
 
             def _read_payload(self) -> LocalPairingPayload:
                 body = self.rfile.read(int(self.headers.get("Content-Length", "0")))
@@ -107,6 +117,7 @@ class LocalPairingServer:
             "device_id": self._config.device_id,
             "device_name": self._config.device_name,
             "path": "/pair",
+            "unlink_path": "/unlink",
         }
         service_name = f"{self._safe_service_name()}." f"{self._config.local_pairing_service_type}"
         self._service_info = ServiceInfo(
@@ -150,6 +161,10 @@ def _claim_local_pairing(config: SpeakerConfig, payload: LocalPairingPayload) ->
         device_name=payload.device_name,
         auth_token=payload.auth_token,
     )
+
+
+def _clear_local_pairing(config: SpeakerConfig) -> Dict[str, bool]:
+    return DevicePairingClient(config).clear_local_pairing()
 
 
 def _linked_response(config: SpeakerConfig, device_name: str, token: str) -> Dict[str, object]:
