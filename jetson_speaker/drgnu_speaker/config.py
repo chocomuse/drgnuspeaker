@@ -57,14 +57,23 @@ class SpeakerConfig:
     settings_sync_enabled: bool
     settings_sync_seconds: float
     work_dir: Path
+    hotspot_ssid: str
     hotspot_ssid_prefix: str
     hotspot_password: str
     hotspot_port: int
+    hotspot_gateway_ip: str
+    wifi_setup_token: str
+    wifi_setup_timeout_seconds: float
     google_stt_enabled: bool
     google_stt_api_key: str
     google_stt_language_code: str
     google_services_json: Optional[Path]
     google_service_account_json: Optional[Path]
+    event_log_path: Optional[Path]
+    wake_min_rms: float
+    wake_min_confidence: float
+    wake_cooldown_seconds: float
+    system_metrics_seconds: float
 
 
     @property
@@ -138,14 +147,23 @@ def load_config() -> SpeakerConfig:
         settings_sync_enabled=_bool_env("DRGNU_SETTINGS_SYNC_ENABLED", True),
         settings_sync_seconds=float(os.getenv("DRGNU_SETTINGS_SYNC_SECONDS", "30")),
         work_dir=Path(os.getenv("DRGNU_WORK_DIR", "/tmp/drgnu-speaker")),
+        hotspot_ssid=os.getenv("DRGNU_HOTSPOT_SSID", "DrGNU-Speaker-Setup").strip(),
         hotspot_ssid_prefix=os.getenv("DRGNU_HOTSPOT_SSID_PREFIX", "Drgnu-Speaker-").strip(),
         hotspot_password=os.getenv("DRGNU_HOTSPOT_PASSWORD", "drgnuspeaker").strip(),
-        hotspot_port=int(os.getenv("DRGNU_HOTSPOT_PORT", "80")),
+        hotspot_port=int(os.getenv("DRGNU_HOTSPOT_PORT", "8765")),
+        hotspot_gateway_ip=os.getenv("DRGNU_HOTSPOT_GATEWAY_IP", "192.168.4.1").strip(),
+        wifi_setup_token=os.getenv("DRGNU_WIFI_SETUP_TOKEN", "").strip(),
+        wifi_setup_timeout_seconds=float(os.getenv("DRGNU_WIFI_SETUP_TIMEOUT_SECONDS", "900")),
         google_stt_enabled=_bool_env("DRGNU_GOOGLE_STT_ENABLED", False),
         google_stt_api_key=os.getenv("DRGNU_GOOGLE_STT_API_KEY", "").strip(),
         google_stt_language_code=os.getenv("DRGNU_GOOGLE_STT_LANGUAGE_CODE", "ko-KR").strip(),
         google_services_json=_optional_path("DRGNU_GOOGLE_SERVICES_JSON"),
         google_service_account_json=_optional_path("DRGNU_GOOGLE_SERVICE_ACCOUNT_JSON"),
+        event_log_path=_optional_path("DRGNU_EVENT_LOG_PATH", "logs/experiments.jsonl"),
+        wake_min_rms=float(os.getenv("DRGNU_WAKE_MIN_RMS", "180")),
+        wake_min_confidence=float(os.getenv("DRGNU_WAKE_MIN_CONFIDENCE", "0.55")),
+        wake_cooldown_seconds=float(os.getenv("DRGNU_WAKE_COOLDOWN_SECONDS", "2.0")),
+        system_metrics_seconds=float(os.getenv("DRGNU_SYSTEM_METRICS_SECONDS", "60")),
     )
 
 
@@ -164,8 +182,8 @@ def _optional_int(name: str) -> Optional[int]:
     return int(value)
 
 
-def _optional_path(name: str) -> Optional[Path]:
-    value = os.getenv(name, "").strip()
+def _optional_path(name: str, default: str = "") -> Optional[Path]:
+    value = os.getenv(name, default).strip()
     if not value:
         return None
     return Path(value).expanduser()

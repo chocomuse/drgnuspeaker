@@ -91,6 +91,57 @@ Check service logs:
 journalctl -u drgnu-speaker -f
 ```
 
+Experiment events are written as JSON Lines by default:
+
+```text
+jetson_speaker/logs/experiments.jsonl
+```
+
+Each record contains a UTC timestamp, event name, device ID, success state, and measured duration where applicable. This file can be imported into Python, R, or a spreadsheet for paper evaluation.
+
+The program also records memory usage, system load, and the highest available thermal-zone temperature every 60 seconds. Set `DRGNU_SYSTEM_METRICS_SECONDS=0` to disable this sampling. Electrical power still requires an external power meter.
+
+## Screenless Wi-Fi Setup API
+
+If the Jetson has no internet connection, it enters setup AP mode:
+
+```text
+SSID: DrGNU-Speaker-Setup
+Password: drgnuspeaker
+Gateway: 192.168.4.1
+Port: 8765
+```
+
+The Android app can connect the phone to that setup Wi-Fi and send the target Wi-Fi credentials:
+
+```text
+POST http://192.168.4.1:8765/wifi
+Content-Type: application/json
+```
+
+```json
+{
+  "ssid": "Home WiFi",
+  "password": "wifi-password",
+  "device_id": "jetson-nano-001",
+  "user_id": "app-user-id"
+}
+```
+
+The response is `202` with `status: connecting`. The app should poll:
+
+```text
+GET http://192.168.4.1:8765/status
+```
+
+After Wi-Fi succeeds, setup AP mode stops and the normal local speaker API starts on the real LAN IP:
+
+```text
+POST http://{speaker-ip}:8765/pair
+GET  http://{speaker-ip}:8765/settings
+POST http://{speaker-ip}:8765/unlink
+```
+
 ## Pair With The Android App
 
 ### Option A: Nearby Speaker Discovery

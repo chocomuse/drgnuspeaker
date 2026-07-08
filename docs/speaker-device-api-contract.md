@@ -27,6 +27,76 @@ The current MVP can continue using:
 X-API-Key: {api_key}
 ```
 
+## Screenless Wi-Fi Setup
+
+When the Jetson has no internet connection, it starts a setup access point and a local HTTP server.
+
+```text
+SSID: DrGNU-Speaker-Setup
+Password: drgnuspeaker
+Gateway IP: 192.168.4.1
+Port: 8765
+```
+
+### Status
+
+```text
+GET http://192.168.4.1:8765/status
+```
+
+Response:
+
+```json
+{
+  "mode": "setup_ap",
+  "status": "idle",
+  "wifi_connected": false,
+  "device_id": "jetson-nano-001",
+  "device_name": "DrGNU Speaker",
+  "setup_ssid": "DrGNU-Speaker-Setup",
+  "setup_ip": "192.168.4.1",
+  "port": 8765,
+  "connected_ssid": "",
+  "error": ""
+}
+```
+
+### Configure Wi-Fi
+
+```text
+POST http://192.168.4.1:8765/wifi
+Content-Type: application/json
+```
+
+When `DRGNU_WIFI_SETUP_TOKEN` is configured, the app must also send:
+
+```text
+X-Setup-Token: {setup-token}
+```
+
+Request:
+
+```json
+{
+  "ssid": "Home WiFi",
+  "password": "wifi-password",
+  "device_id": "jetson-nano-001",
+  "user_id": "app-user-id"
+}
+```
+
+Immediate response:
+
+```json
+{
+  "ok": true,
+  "status": "connecting",
+  "status_url": "http://192.168.4.1:8765/status"
+}
+```
+
+The app should poll `/status`. On success, the setup AP stops and the normal local pairing server starts on the speaker's real LAN IP.
+
 ## Pairing
 
 ### Local Network Pairing

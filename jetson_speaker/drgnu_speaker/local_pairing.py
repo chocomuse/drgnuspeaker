@@ -10,6 +10,7 @@ from typing import Dict, Optional, Type
 from zeroconf import ServiceInfo, Zeroconf
 
 from .config import SpeakerConfig
+from .event_log import EventLogger
 from .pairing import DevicePairingClient
 
 
@@ -32,8 +33,9 @@ class LocalPairingPayload:
 
 
 class LocalPairingServer:
-    def __init__(self, config: SpeakerConfig) -> None:
+    def __init__(self, config: SpeakerConfig, event_logger: Optional[EventLogger] = None) -> None:
         self._config = config
+        self._event_logger = event_logger
         self._server: Optional[ThreadingHTTPServer] = None
         self._thread: Optional[threading.Thread] = None
         self._zeroconf: Optional[Zeroconf] = None
@@ -64,27 +66,45 @@ class LocalPairingServer:
 
     def _build_handler(self) -> Type[BaseHTTPRequestHandler]:
         config = self._config
+        event_logger = self._event_logger
 
         class Handler(BaseHTTPRequestHandler):
             def do_GET(self) -> None:
-                if self.path != "/info":
-                    self._send_json(404, {"error": "not_found"})
+                if self.path == "/info":
+                    self._send_json(200, _device_info(config))
                     return
-                self._send_json(200, _device_info(config))
+                if self.path == "/settings":
+                    self._send_json(200, _device_settings(config))
+                    return
+                self._send_json(404, {"error": "not_found"})
 
             def do_POST(self) -> None:
                 if self.path == "/pair":
                     try:
                         payload = self._read_payload()
                         token = _claim_local_pairing(config, payload)
+                        if event_logger is not None:
+                            event_logger.emit(
+                                "local_pairing_completed",
+                                success=True,
+                                has_user_id=bool(payload.user_id),
+                            )
                         self._send_json(200, _linked_response(config, payload.device_name, token))
                     except Exception as error:
+                        if event_logger is not None:
+                            event_logger.emit(
+                                "local_pairing_completed",
+                                success=False,
+                                error_type=type(error).__name__,
+                            )
                         self._send_json(500, {"linked": False, "error": str(error)})
                     return
 
                 if self.path in ("/unlink", "/unpair", "/disconnect"):
                     try:
                         result = _clear_local_pairing(config)
+                        if event_logger is not None:
+                            event_logger.emit("local_pairing_cleared", success=True, **result)
                         self._send_json(200, {"linked": False, "cleared": True, **result})
                     except Exception as error:
                         self._send_json(500, {"linked": True, "cleared": False, "error": str(error)})
@@ -151,6 +171,16 @@ def _device_info(config: SpeakerConfig) -> Dict[str, object]:
         "device_id": config.device_id,
         "device_name": config.device_name,
         "device_type": "jetson_nano_speaker",
+    }
+
+
+def _device_settings(config: SpeakerConfig) -> Dict[str, object]:
+    return {
+        "device_id": config.device_id,
+        "device_name": config.device_name,
+        "wake_mode": config.wake_mode,
+        "record_seconds": config.record_seconds,
+        "local_pairing_enabled": config.local_pairing_enabled,
     }
 
 

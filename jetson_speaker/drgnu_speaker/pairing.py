@@ -46,34 +46,26 @@ class DevicePairingClient:
         return token
 
     def create_pairing_code(self) -> PairingSession:
-        try:
-            response = self._session.post(
-                self._config.pairing_code_url,
-                json={
-                    "device_id": self._config.device_id,
-                    "device_name": self._config.device_name,
-                    "device_type": "jetson_nano_speaker",
-                },
-                timeout=(15, 30),
-            )
-            response.raise_for_status()
-            payload = response.json()
-            return PairingSession(
-                pairing_code=str(payload["pairing_code"]),
-                expires_in_seconds=int(payload.get("expires_in_seconds", 600)),
-            )
-        except Exception as e:
-            print(f"[drgnu-speaker] Failed to get pairing code from server: {e}", flush=True)
-            print("[drgnu-speaker] Falling back to Local Simulation Pairing Mode (Code: 123456)", flush=True)
-            return PairingSession(pairing_code="123456", expires_in_seconds=60)
+        response = self._session.post(
+            self._config.pairing_code_url,
+            json={
+                "device_id": self._config.device_id,
+                "device_name": self._config.device_name,
+                "device_type": "jetson_nano_speaker",
+            },
+            timeout=(15, 30),
+        )
+        response.raise_for_status()
+        payload = response.json()
+        pairing_code = str(payload.get("pairing_code", "")).strip()
+        if not pairing_code:
+            raise RuntimeError("Pairing server returned no pairing_code")
+        return PairingSession(
+            pairing_code=pairing_code,
+            expires_in_seconds=int(payload.get("expires_in_seconds", 600)),
+        )
 
     def poll_until_claimed(self, pairing_code: str, expires_in_seconds: int) -> str:
-        if pairing_code == "123456":
-            print("[drgnu-speaker] (Simulation) Waiting 10 seconds for user to enter code 123456...", flush=True)
-            time.sleep(10)
-            print("[drgnu-speaker] (Simulation) Device pairing completed successfully.", flush=True)
-            return "mock-device-access-token"
-
         deadline = time.monotonic() + expires_in_seconds
         while time.monotonic() < deadline:
             response = self._session.post(
@@ -95,39 +87,28 @@ class DevicePairingClient:
         raise TimeoutError("Device pairing code expired before the app claimed it")
 
     def claim_local_pairing(self, user_id: str, user_name: str, device_name: str, auth_token: str = "") -> str:
-        try:
-            response = self._session.post(
-                f"{self._config.base_url.rstrip('/')}/api/devices/link-local",
-                json={
-                    "device_id": self._config.device_id,
-                    "device_name": device_name or self._config.device_name,
-                    "device_type": "jetson_nano_speaker",
-                    "user_id": user_id,
-                    "user_name": user_name,
-                },
-                timeout=(15, 30),
-            )
-            response.raise_for_status()
-            payload = response.json()
-            token = str(payload.get("device_access_token", "")).strip()
-            if token:
-                self._save_token(token)
-                self._save_user_info(user_id, user_name)
-                return token
-        except Exception as e:
-            print(f"[drgnu-speaker] Local pairing API call failed: {e}", flush=True)
-
-        if auth_token:
-            print("[drgnu-speaker] Fallback: Using user auth_token for API requests.", flush=True)
-            self._save_token(auth_token)
-            self._save_user_info(user_id, user_name)
-            return auth_token
-        else:
-            print("[drgnu-speaker] Fallback: No auth_token provided, generating mock token.", flush=True)
-            token = "mock-local-pairing-token"
-            self._save_token(token)
-            self._save_user_info(user_id, user_name)
-            return token
+        if not user_id:
+            raise ValueError("user_id is required for local pairing")
+        response = self._session.post(
+            f"{self._config.base_url.rstrip('/')}/api/devices/link-local",
+            json={
+                "device_id": self._config.device_id,
+                "device_name": device_name or self._config.device_name,
+                "device_type": "jetson_nano_speaker",
+                "user_id": user_id,
+                "user_name": user_name,
+            },
+            headers={"Authorization": f"Bearer {auth_token}"} if auth_token else None,
+            timeout=(15, 30),
+        )
+        response.raise_for_status()
+        payload = response.json()
+        token = str(payload.get("device_access_token", "")).strip()
+        if not token:
+            raise RuntimeError("Local pairing server returned no device_access_token")
+        self._save_token(token)
+        self._save_user_info(user_id, user_name)
+        return token
 
     def clear_local_pairing(self) -> dict[str, bool]:
         token_removed = self._remove_file(self._token_path())

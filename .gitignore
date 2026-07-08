@@ -17,3 +17,4 @@ build/
 jetson_speaker/models/
 jetson_speaker/.tmp/
 jetson_speaker/tmp/
+jetson_speaker/logs/

@@ -11,8 +11,10 @@ from typing import Optional, Tuple
 
 import sounddevice as sd
 import soundfile as sf
+import numpy as np
 
 from .config import SpeakerConfig
+from .event_log import EventLogger
 from .stt import GoogleSpeechClient
 
 
@@ -41,9 +43,11 @@ class ButtonWakeDetector(WakeDetector):
 
 
 class GoogleSttWakeDetector(WakeDetector):
-    def __init__(self, config: SpeakerConfig) -> None:
+    def __init__(self, config: SpeakerConfig, event_logger: Optional[EventLogger] = None) -> None:
         self._config = config
-        self._stt = GoogleSpeechClient(config)
+        self._event_logger = event_logger
+        self._stt = GoogleSpeechClient(config, event_logger)
+        self._last_match_at = 0.0
         self._phrases = tuple(
             phrase
             for phrase in (_normalize_text(item) for item in config.wake_phrases)
@@ -64,24 +68,43 @@ class GoogleSttWakeDetector(WakeDetector):
                 if elapsed > self._config.wake_timeout_seconds:
                     raise TimeoutError("Wake phrase was not detected before timeout")
 
-            audio_path = self._record_wake_clip()
+            audio_path, rms = self._record_wake_clip()
+            if rms < self._config.wake_min_rms:
+                if self._event_logger is not None:
+                    self._event_logger.emit("wake_clip_skipped", reason="low_rms", rms=round(rms, 2))
+                audio_path.unlink(missing_ok=True)
+                continue
             try:
-                text = self._stt.transcribe(audio_path)
+                recognition = self._stt.transcribe_result(audio_path)
             finally:
                 try:
                     audio_path.unlink()
                 except OSError:
                     pass
 
-            if text:
-                print(f"[drgnu-speaker] wake stt heard: {text}", flush=True)
-            if self._contains_wake_phrase(text):
+            if recognition.transcript:
+                print(f"[drgnu-speaker] wake stt heard: {recognition.transcript}", flush=True)
+            confidence_ok = (
+                recognition.confidence is None
+                or recognition.confidence >= self._config.wake_min_confidence
+            )
+            matched = confidence_ok and self._contains_wake_phrase(recognition.transcript)
+            if self._event_logger is not None:
+                self._event_logger.emit(
+                    "wake_detection_attempt",
+                    matched=matched,
+                    rms=round(rms, 2),
+                    confidence=recognition.confidence,
+                    transcript=recognition.transcript,
+                )
+            if matched and time.monotonic() - self._last_match_at >= self._config.wake_cooldown_seconds:
+                self._last_match_at = time.monotonic()
                 return
 
             if self._config.wake_stt_pause_seconds > 0:
                 time.sleep(self._config.wake_stt_pause_seconds)
 
-    def _record_wake_clip(self) -> Path:
+    def _record_wake_clip(self) -> tuple[Path, float]:
         duration = max(0.5, self._config.wake_stt_seconds)
         sample_rate = self._config.sample_rate
         channels = self._config.channels
@@ -94,6 +117,7 @@ class GoogleSttWakeDetector(WakeDetector):
             dtype="int16",
         )
         sd.wait()
+        rms = float(np.sqrt(np.mean(audio.astype(np.float32) ** 2)))
 
         self._config.work_dir.mkdir(parents=True, exist_ok=True)
         with tempfile.NamedTemporaryFile(
@@ -104,7 +128,7 @@ class GoogleSttWakeDetector(WakeDetector):
         ) as temp_file:
             output_path = Path(temp_file.name)
         sf.write(output_path, audio, sample_rate)
-        return output_path
+        return output_path, rms
 
     def _contains_wake_phrase(self, text: str) -> bool:
         normalized = _normalize_text(text)
@@ -218,13 +242,16 @@ def _normalize_text(value: str) -> str:
     return re.sub(r"[^0-9a-zA-Z\uac00-\ud7a3]+", "", value).lower()
 
 
-def build_wake_detector(config: SpeakerConfig) -> WakeDetector:
+def build_wake_detector(
+    config: SpeakerConfig,
+    event_logger: Optional[EventLogger] = None,
+) -> WakeDetector:
     if config.wake_mode == "keyboard":
         return KeyboardWakeDetector()
     if config.wake_mode == "button":
         return ButtonWakeDetector(config.ptt_gpio_pin)
     if config.wake_mode in ("google_stt", "stt", "google"):
-        return GoogleSttWakeDetector(config)
+        return GoogleSttWakeDetector(config, event_logger)
     if config.wake_mode in ("phrase", "vosk"):
         return VoskPhraseWakeDetector(
             model_path=config.wake_model_path,

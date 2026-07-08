@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import base64
 import json
+import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
 
@@ -10,18 +12,26 @@ from google.auth.transport.requests import Request
 from google.oauth2 import service_account
 
 from .config import SpeakerConfig
+from .event_log import EventLogger
 
 
 SPEECH_SCOPE = "https://www.googleapis.com/auth/cloud-platform"
 
 
+@dataclass(frozen=True)
+class SpeechRecognition:
+    transcript: str
+    confidence: Optional[float]
+
+
 class GoogleSpeechClient:
-    def __init__(self, config: SpeakerConfig) -> None:
+    def __init__(self, config: SpeakerConfig, event_logger: Optional[EventLogger] = None) -> None:
         self._config = config
         self._api_key = ""
         self._credentials: service_account.Credentials | None = None
         self._http = requests.Session()
         self._http.trust_env = False
+        self._event_logger = event_logger
 
         if not config.google_stt_enabled:
             print("[google-stt] disabled. Set DRGNU_GOOGLE_STT_ENABLED=true to enable it.", flush=True)
@@ -48,12 +58,16 @@ class GoogleSpeechClient:
         return bool(self._config.google_stt_enabled and (self._credentials or self._api_key))
 
     def transcribe(self, audio_path: Path) -> str:
+        return self.transcribe_result(audio_path).transcript
+
+    def transcribe_result(self, audio_path: Path) -> SpeechRecognition:
         if not self.enabled:
-            return ""
+            return SpeechRecognition("", None)
         if not audio_path.exists():
             print(f"[google-stt] audio file not found: {audio_path}", flush=True)
-            return ""
+            return SpeechRecognition("", None)
 
+        started_at = time.monotonic()
         try:
             audio_content = base64.b64encode(audio_path.read_bytes()).decode("ascii")
             payload = {
@@ -73,20 +87,29 @@ class GoogleSpeechClient:
 
             if response.status_code != 200:
                 self._print_error(response)
-                return ""
+                self._emit_event(started_at, False, status_code=response.status_code)
+                return SpeechRecognition("", None)
 
-            transcript = self._best_transcript(response.json())
-            if transcript:
-                print(f"[google-stt] transcript: {transcript}", flush=True)
+            recognition = self._best_recognition(response.json())
+            if recognition.transcript:
+                print(f"[google-stt] transcript: {recognition.transcript}", flush=True)
             else:
                 print("[google-stt] no speech recognized", flush=True)
-            return transcript
+            self._emit_event(
+                started_at,
+                True,
+                recognized=bool(recognition.transcript),
+                confidence=recognition.confidence,
+            )
+            return recognition
         except requests.RequestException as error:
             print(f"[google-stt] request failed: {error}", flush=True)
-            return ""
+            self._emit_event(started_at, False, error_type=type(error).__name__)
+            return SpeechRecognition("", None)
         except Exception as error:
             print(f"[google-stt] transcription failed: {error}", flush=True)
-            return ""
+            self._emit_event(started_at, False, error_type=type(error).__name__)
+            return SpeechRecognition("", None)
 
     def _post_recognize(self, payload: dict[str, Any]) -> requests.Response:
         url = "https://speech.googleapis.com/v1/speech:recognize"
@@ -147,15 +170,33 @@ class GoogleSpeechClient:
             print(f"[google-stt] failed to read google-services file: {error}", flush=True)
             return ""
 
-    def _best_transcript(self, payload: dict[str, Any]) -> str:
+    def _best_recognition(self, payload: dict[str, Any]) -> SpeechRecognition:
         parts = []
+        confidences = []
         for result in payload.get("results", []):
             alternatives = result.get("alternatives", [])
             if alternatives:
                 transcript = str(alternatives[0].get("transcript", "")).strip()
                 if transcript:
                     parts.append(transcript)
-        return " ".join(parts).strip()
+                confidence = alternatives[0].get("confidence")
+                if confidence is not None:
+                    try:
+                        confidences.append(float(confidence))
+                    except (TypeError, ValueError):
+                        pass
+        average_confidence = sum(confidences) / len(confidences) if confidences else None
+        return SpeechRecognition(" ".join(parts).strip(), average_confidence)
+
+    def _emit_event(self, started_at: float, success: bool, **fields: Any) -> None:
+        if self._event_logger is None:
+            return
+        self._event_logger.emit(
+            "google_stt_completed",
+            success=success,
+            duration_ms=round((time.monotonic() - started_at) * 1000, 2),
+            **fields,
+        )
 
     def _print_error(self, response: requests.Response) -> None:
         try:
